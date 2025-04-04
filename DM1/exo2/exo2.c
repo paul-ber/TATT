@@ -9,9 +9,9 @@ void traite(size_t size, char *buf, struct sockaddr_in *sa, int sock)
 {
     register unsigned int i;
     char cmd[128];
-    for (i = 0; i < size && buf[i] != ’ ’; ++i)
+    for (i = 0; i < size && buf[i] != ' '; ++i)
         cmd[i] = buf[i];
-    cmd[i] = ’\0’;
+    cmd[i] = '\0';
     printf(">%s<\n", cmd);
     if (strcmp(cmd, "ping") == 0)
         sendto(sock, "pong\n", 5, 0, (struct sockaddr*)sa,
@@ -24,6 +24,7 @@ void traite(size_t size, char *buf, struct sockaddr_in *sa, int sock)
     }
     printf("fin de traite\n");
 }
+
 int main(int argc, char *argv[])
 {
     int sock;
@@ -50,7 +51,7 @@ int main(int argc, char *argv[])
         if (recsize != 0)
         {
             printf("recu : %d\n", recsize);
-            buffer[recsize - 1] = ’\0’;
+            buffer[recsize - 1] = '\0';
             traite(recsize, buffer, &sa, sock);
         }
     }
