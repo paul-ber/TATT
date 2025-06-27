@@ -13,6 +13,35 @@ malformées sur les commandes FTP courantes. Il effectue les tests suivants:
 - Test des commandes avec des arguments multiples
 - Test des séquences de commandes invalides
 - Détection des plantages par perte de connexion ou timeout
+
+Stratégie: Connexion fraîche pour chaque test individuel afin d'éviter les effets de bord
+et d'avoir un processus serveur "propre" pour chaque tentative d'exploitation.
+
+EXEMPLES DE SORTIE DU FUZZER :
+
+Test négatif (aucune vulnérabilité détectée) :
+[*] Test: PWD avec Buffer de 100 'A'
+[+] Connexion établie: 220 Welcome to FuzzeMeSteckFTP v1.0
+[+] Authentification réussie
+[+] Réponse: 501 Syntax error in parameters or arguments...
+[+] Test terminé normalement
+
+Test positif (vulnérabilité détectée) :
+[*] Test: APPE avec Buffer de 1000 'A'
+[+] Connexion établie: 220 Welcome to FuzzeMeSteckFTP v1.0
+[+] Authentification réussie
+[!] CRASH DÉTECTÉ! Connexion fermée brutalement
+[!] Commande: APPE
+[!] Payload: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA[...]
+[!] Longueur payload: 1000
+
+[*] === RAPPORT FINAL ===
+[*] Nombre de crashes détectés: 1
+[!] VULNÉRABILITÉS TROUVÉES:
+[!] Commande: APPE
+[!] Payload: Buffer de 1000 'A'
+[!] Données: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA[...]
+[!] ---
 """
 
 import socket
@@ -21,100 +50,97 @@ import time
 import signal
 
 # Variables de configuration - Modifier selon vos credentials
-FTP_USER = "anonymous"
-FTP_PASS = "test@test.com"
+FTP_USER = "test"
+FTP_PASS = "test"
 
 class FTPFuzzer:
     def __init__(self, host, port=21):
         self.host = host
         self.port = port
-        self.socket = None
-        self.connected = False
-        self.authenticated = False
 
-    def connect(self):
-        """Établit la connexion au serveur FTP"""
+    def connect_and_auth(self):
+        """Établit une nouvelle connexion et s'authentifie"""
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(10)
-            self.socket.connect((self.host, self.port))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(10)
+            sock.connect((self.host, self.port))
             
             # Lire la bannière
-            response = self.socket.recv(1024).decode('utf-8', errors='ignore')
+            response = sock.recv(1024).decode('utf-8', errors='ignore')
             print(f"[+] Connexion établie: {response.strip()}")
-            self.connected = True
-            return True
             
-        except Exception as e:
-            print(f"[-] Erreur de connexion: {e}")
-            return False
-
-    def send_command(self, command):
-        """Envoie une commande et retourne la réponse"""
-        try:
-            if not self.connected:
-                return None
-                
-            self.socket.send((command + "\r\n").encode('utf-8', errors='ignore'))
-            response = self.socket.recv(4096).decode('utf-8', errors='ignore')
-            return response
-            
-        except socket.timeout:
-            print(f"[!] TIMEOUT sur commande: {command[:50]}...")
-            return "TIMEOUT"
-        except Exception as e:
-            print(f"[!] ERREUR CONNEXION sur commande: {command[:50]}... - {e}")
-            return None
-
-    def authenticate(self):
-        """S'authentifie sur le serveur FTP"""
-        try:
-            # Envoyer USER
-            response = self.send_command(f"USER {FTP_USER}")
-            if not response or not ("331" in response or "230" in response):
+            # Authentification
+            sock.send(f"USER {FTP_USER}\r\n".encode('utf-8'))
+            response = sock.recv(1024).decode('utf-8', errors='ignore')
+            if not ("331" in response or "230" in response):
                 print(f"[-] Échec USER: {response}")
-                return False
+                sock.close()
+                return None
             
-            # Envoyer PASS si nécessaire
             if "331" in response:
-                response = self.send_command(f"PASS {FTP_PASS}")
-                if not response or "230" not in response:
+                sock.send(f"PASS {FTP_PASS}\r\n".encode('utf-8'))
+                response = sock.recv(1024).decode('utf-8', errors='ignore')
+                if "230" not in response:
                     print(f"[-] Échec PASS: {response}")
-                    return False
+                    sock.close()
+                    return None
             
             print("[+] Authentification réussie")
-            self.authenticated = True
-            return True
+            return sock
             
         except Exception as e:
-            print(f"[-] Erreur authentification: {e}")
-            return False
+            print(f"[-] Erreur de connexion/auth: {e}")
+            return None
 
-    def test_command(self, command, payload, description=""):
-        """Teste une commande avec un payload donné"""
-        print(f"[*] Test: {command} avec {description}")
+    def test_single_command(self, command, payload, description=""):
+        """Teste UNE commande avec UNE connexion fraîche"""
+        print(f"\n[*] Test: {command} avec {description}")
         
-        # Reconnexion si nécessaire
-        if not self.connected:
-            if not self.connect() or not self.authenticate():
-                return False
+        # Nouvelle connexion pour ce test
+        sock = self.connect_and_auth()
+        if not sock:
+            print("[-] Impossible de se connecter pour ce test")
+            return False
         
-        test_cmd = f"{command} {payload}"
-        response = self.send_command(test_cmd)
+        try:
+            # Envoyer la commande de test
+            test_cmd = f"{command} {payload}\r\n"
+            sock.send(test_cmd.encode('utf-8', errors='ignore'))
+            
+            # Attendre la réponse avec un timeout
+            sock.settimeout(5)
+            response = sock.recv(4096).decode('utf-8', errors='ignore')
+            
+            if response:
+                print(f"[+] Réponse: {response[:100].strip()}...")
+                print("[+] Test terminé normalement")
+                crash_detected = False
+            else:
+                print("[!] CRASH DÉTECTÉ! Aucune réponse reçue")
+                crash_detected = True
+                
+        except socket.timeout:
+            print("[!] CRASH DÉTECTÉ! Timeout - serveur ne répond plus")
+            crash_detected = True
+        except ConnectionResetError:
+            print("[!] CRASH DÉTECTÉ! Connexion fermée brutalement")
+            crash_detected = True
+        except Exception as e:
+            print(f"[!] CRASH DÉTECTÉ! Erreur: {e}")
+            crash_detected = True
+        finally:
+            try:
+                sock.close()
+            except:
+                pass
         
-        if response is None:
-            print(f"[!] CRASH DÉTECTÉ! Commande: {command}")
+        if crash_detected:
+            print(f"[!] Commande: {command}")
             print(f"[!] Payload: {payload[:100]}...")
             print(f"[!] Longueur payload: {len(payload)}")
-            self.connected = False
-            return True  # Crash détecté
-        elif response == "TIMEOUT":
-            print(f"[!] TIMEOUT DÉTECTÉ! Commande: {command}")
-            self.connected = False
-            return True  # Potentiel crash
-        else:
-            print(f"[+] Réponse: {response[:100].strip()}...")
-            return False
+            return True
+        
+        return False
 
     def generate_payloads(self):
         """Génère différents types de payloads de test"""
@@ -138,7 +164,7 @@ class FTPFuzzer:
 
     def fuzz_ftp_commands(self):
         """Teste les commandes FTP avec différents payloads"""
-        # Commandes FTP à tester (après authentification)
+        # Commandes FTP principales à tester
         ftp_commands = [
             "PWD", "CWD", "MKD", "RMD", "DELE", "RNFR", "RNTO",
             "LIST", "NLST", "RETR", "STOR", "APPE", "REST",
@@ -146,8 +172,9 @@ class FTPFuzzer:
             "SYST", "STAT", "TYPE", "MODE", "STRU", "ALLO"
         ]
         
-        print(f"\n[*] Début du fuzzing sur {self.host}:{self.port}")
+        print(f"[*] Début du fuzzing sur {self.host}:{self.port}")
         print(f"[*] Credentials: {FTP_USER} / {FTP_PASS}")
+        print(f"[*] Stratégie: Connexion fraîche pour chaque test")
         
         crashes = []
         payloads = self.generate_payloads()
@@ -156,22 +183,16 @@ class FTPFuzzer:
             print(f"\n[*] === Test de la commande {command} ===")
             
             for payload, description in payloads:
-                if self.test_command(command, payload, description):
+                crash_detected = self.test_single_command(command, payload, description)
+                
+                if crash_detected:
                     crashes.append((command, payload, description))
                     print(f"[!] >>> VULNÉRABILITÉ TROUVÉE: {command} <<<")
-                    break  # Passer à la commande suivante après crash
+                    # Continuer avec les autres payloads pour cette commande
                 
-                time.sleep(0.1)  # Pause entre tests
+                time.sleep(0.5)  # Pause plus longue entre tests
         
         return crashes
-
-    def close(self):
-        """Ferme la connexion"""
-        try:
-            if self.socket:
-                self.socket.close()
-        except:
-            pass
 
 def signal_handler(sig, frame):
     """Gestionnaire de signal pour arrêt propre"""
@@ -190,14 +211,14 @@ def main():
     fuzzer = FTPFuzzer(target_host)
     
     try:
-        # Connexion initiale et authentification
-        if not fuzzer.connect():
+        # Test de connexion initial
+        print("[*] Test de connexion initial...")
+        test_sock = fuzzer.connect_and_auth()
+        if not test_sock:
             print("[-] Impossible de se connecter au serveur")
             sys.exit(1)
-        
-        if not fuzzer.authenticate():
-            print("[-] Impossible de s'authentifier")
-            sys.exit(1)
+        test_sock.close()
+        print("[+] Serveur accessible, début du fuzzing...")
         
         # Lancement du fuzzing
         crashes = fuzzer.fuzz_ftp_commands()
@@ -215,9 +236,11 @@ def main():
                 print("[!] ---")
         else:
             print("[+] Aucune vulnérabilité détectée")
-    
-    finally:
-        fuzzer.close()
+            
+    except KeyboardInterrupt:
+        print("\n[*] Arrêt demandé par l'utilisateur")
+    except Exception as e:
+        print(f"[-] Erreur inattendue: {e}")
 
 if __name__ == "__main__":
     main()
