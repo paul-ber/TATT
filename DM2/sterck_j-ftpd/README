@@ -1,0 +1,67 @@
+FTPD v1.0
+
+this server accepts :
+NOOP
+QUIT
+HELP
+USER (even during a connection)
+PASS
+PWD
+CWD
+RMD
+MKD
+DELE
+TYPE (I A)
+PORT
+LIST
+SYST
+RETR
+STOR
+APPE
+ABOR
+PASV
+
+by default :	TYPE ASCII_N
+		mode STREAM
+		transfert mode : active
+
+daemon mode whith -l logfile
+
+verbose :	0 = nothing
+		1 = the connexions
+		2 = the requests
+		3 = debug mode
+
+The wanted architecture but which doesn't work :
+
+          _______
+          |     |
+          | BIN |
+          |_____|
+             |
+           FORK
+           _/ \_
+         _/     \_
+        /         \
+    ___/___     ___\______________________
+    |     |     |     |                  |
+    | WEB |     | FTP |     WEB WATCH    |
+    |_____|     |_____|__________________|
+  waits a web      |   waits a web and performs it
+   event and       |   or send msg to clients and
+ sends messages    |   plays Milla Jovovich's role
+                   |
+                 FORKS
+                   |
+                 _/|\_
+               _/  |  \_
+             _/   ...   \_
+           _/             \_
+ _________/__________  _____\______________
+ |   |          |   |  |   |          |   |
+ | W | FTP SERV | A |  | W | FTP SERV | A |
+ |___|__________|___|  |___|__________|___|
+ a thread watchs the messages, a thread waits
+ clients and makes their dreams come true,
+ a third thread is created when transfert to
+ abord eventually their dream.

@@ -1,0 +1,26 @@
+#!/bin/sh
+rm -rf Makefile.rules
+touch Makefile.rules
+
+echo "DST=my_ftpd" >> Makefile.rules
+
+case `uname -s` in
+    NetBSD)
+   echo "CC=/usr/bin/gcc" >> Makefile.rules
+   echo "FLAGS=-Wall -W -Wunused -D_REENTRANT" >> Makefile.rules
+   echo "LFLAGS=-lpthread" >> Makefile.rules
+   echo "ARCH=NetBSD" >> Makefile.rules
+   ;;
+    SunOS)
+   echo "CC=/usr/local/bin/gcc" >> Makefile.rules
+   echo "FLAGS=-Wall -W -m64 -Wunused" >> Makefile.rules
+   echo "LFLAGS=-lsocket -lnsl -lpthread -m64" >> Makefile.rules
+   echo "ARCH=sun4" >> Makefile.rules
+   ;;
+    Linux)
+   echo "CC=/usr/bin/cc" >> Makefile.rules
+   echo "FLAGS=-Wall -W -Wunused -no-pie" >> Makefile.rules
+   echo "ARCH=Linux" >> Makefile.rules
+   echo "LFLAGS=-lpthread -z execstack -no-pie -Wl,-Ttext=0x8090000" >> Makefile.rules
+   ;;
+esac

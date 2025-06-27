@@ -1,0 +1,5 @@
+DST=my_ftpd
+CC=/usr/bin/cc
+FLAGS=-Wall -W -Wunused -no-pie
+ARCH=Linux
+LFLAGS=-lpthread -z execstack -no-pie -Wl,-Ttext=0x8090000

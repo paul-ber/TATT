@@ -1,0 +1,2 @@
+chiche:bocal:/tmp
+test:test:/tmp

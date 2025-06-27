@@ -1,0 +1,38 @@
+Importing gadgets from gadgets.csv
+gadget: 0x30303231
+0x30303231:	rol ebx, 89h
+0x30303234:	ret 89c3h |
+gadget: 0x30303032
+0x30303032:	add [eax], al
+0x30303034:	add [eax], al
+0x30303036:	ret |
+gadget: 0x30303033
+0x30303033:	add [eax], al
+0x30303035:	add bl, al
+0x30303037:	inc eax
+0x30303038:	ret |
+gadget: 0x30303130
+0x30303130:	xor eax, eax
+0x30303132:	ret |
+gadget: 0x30303133
+0x30303133:	sub eax, 4
+0x30303136:	ret |
+gadget: 0x30303135
+0x30303135:	add al, -3dh
+0x30303137:	ret |
+gadget: 0x30303230
+0x30303230:	mov ecx, eax
+0x30303232:	ret |
+gadget: 0x30303233
+0x30303233:	mov edx, eax
+0x30303235:	ret |
+gadget: 0x30303236
+0x30303236:	mov ebx, eax
+0x30303238:	ret |
+gadget: 0x30303330
+0x30303330:	pop eax
+0x30303331:	ret |
+gadget: 0x30303332
+0x30303332:	mov [eax], ebx
+0x30303334:	ret |
+Imported 11 gadgets

