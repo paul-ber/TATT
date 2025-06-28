@@ -53,7 +53,7 @@ import sys
 import time
 import signal
 
-# Variables de configuration - Modifier selon vos credentials
+# Variables d'authentification
 FTP_USER = "test"
 FTP_PASS = "test"
 
@@ -168,18 +168,18 @@ class FTPFuzzer:
 
     def fuzz_ftp_commands(self):
         """Teste les commandes FTP avec différents payloads"""
-        # Commandes FTP principales à tester
+        # Commandes FTP à tester
 
         ftp_commands = [
-            "USER", "PASS", "ACCT", "CWD", "CDUP", "SMNT", "PWD", "XPWD",
-            "RETR", "STOR", "APPE", "STOU", "ALLO", "REST", "RNFR", "RNTO",
-            "ABOR", "DELE", "RMD", "MKD", "XMKD", "XRMD", "LIST", "NLST",
-            "STAT", "PORT", "PASV", "LPRT", "LPSV", "EPRT", "EPSV", "TYPE",
-            "STRU", "MODE", "SYST", "FEAT", "OPTS", "HELP", "SITE", "NOOP",
-            "QUIT", "REIN", "SIZE", "MDTM", "MLST", "MLSD", "MFMT", "MFCT",
-            "LANG", "CLNT", "HOST", "AUTH", "PBSZ", "PROT", "CCC", "ADAT",
-            "ENC", "MIC", "CONF", "EPRT", "EPSV", "MODE", "STRU", "SMNT",
-            "ACCT", "REIN"
+            "ABOR", "ACCT", "ADAT", "ALLO", "APPE", "AUTH", "AVBL", "CCC",
+            "CDUP", "CONF", "CSID", "CWD", "DELE", "DSIZ", "ENC", "EPRT",
+            "EPSV", "FEAT", "HELP", "HOST", "LANG", "LIST", "LPRT", "LPSV",
+            "MDTM", "MFCT", "MFF", "MFMT", "MIC", "MKD", "MLSD", "MLST",
+            "MODE", "NLST", "NOOP", "OPTS", "PASS", "PASV", "PBSZ", "PORT",
+            "PROT", "PWD", "QUIT", "REIN", "REST", "RETR", "RMD", "RMDA",
+            "RNFR", "RNTO", "SITE", "SIZE", "SMNT", "SPSV", "STAT", "STOR",
+            "STOU", "STRU", "SYST", "THMB", "TYPE", "USER", "XCUP", "XMKD",
+            "XPWD", "XRCP", "XRMD", "XRSQ", "XSEM", "XSEN"
         ]
 
         print(f"[*] Début du fuzzing sur {self.host}:{self.port}")
@@ -198,7 +198,6 @@ class FTPFuzzer:
                 if crash_detected:
                     crashes.append((command, payload, description))
                     print(f"[!] >>> VULNÉRABILITÉ TROUVÉE: {command} <<<")
-                    # Continuer avec les autres payloads pour cette commande
 
                 time.sleep(0.5)
 
