@@ -2,19 +2,19 @@
 # -*- coding: utf-8 -*-
 
 """
-Fuzzer FTP pour EPITA SRS 2025
+TATT - DM3 : Fuzzer FTP
 Auteur: Paul Berthelot (paul.berthelot@epita.fr)
 Promotion: SRS 2026
 
 Ce fuzzer teste les vulnérabilités d'un serveur FTP en envoyant des données
-malformées sur les commandes FTP courantes. Il effectue les tests suivants:
-- Test de débordement de buffer avec des chaînes de longueur croissante (100, 500, 1000, 2000, 5000 caractères)
+malformées sur toutes les commandes FTP. Il effectue les tests suivants:
+- Test de débordement de buffer avec des chaînes de longueur croissante (100,
+  500, 1000, 2000, 5000 caractères)
 - Test avec des caractères spéciaux et de contrôle
 - Test des commandes avec des arguments multiples
-- Test des séquences de commandes invalides
 - Détection des plantages par perte de connexion ou timeout
 
-Stratégie: Connexion fraîche pour chaque test individuel afin d'éviter les effets de bord
+Nouvelle connexion pour chaque test individuel afin d'éviter les effets de bord
 et d'avoir un processus serveur "propre" pour chaque tentative d'exploitation.
 
 EXEMPLES DE SORTIE DU FUZZER :
@@ -25,23 +25,27 @@ Test négatif (aucune vulnérabilité détectée) :
 [+] Authentification réussie
 [+] Réponse: 501 Syntax error in parameters or arguments...
 [+] Test terminé normalement
+[...]
 
 Test positif (vulnérabilité détectée) :
-[*] Test: APPE avec Buffer de 1000 'A'
+[*] Test: TYPE avec Buffer de 500 'A'
 [+] Connexion établie: 220 Welcome to FuzzeMeSteckFTP v1.0
 [+] Authentification réussie
-[!] CRASH DÉTECTÉ! Connexion fermée brutalement
-[!] Commande: APPE
+[!] CRASH DÉTECTÉ! Aucune réponse reçue
+[!] Commande: TYPE
 [!] Payload: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA[...]
-[!] Longueur payload: 1000
+[!] Longueur payload: 500
+[!] >>> VULNÉRABILITÉ TROUVÉE: TYPE <<<
+[...]
 
 [*] === RAPPORT FINAL ===
-[*] Nombre de crashes détectés: 1
+[*] Nombre de crashes détectés: X
 [!] VULNÉRABILITÉS TROUVÉES:
-[!] Commande: APPE
-[!] Payload: Buffer de 1000 'A'
+[!] Commande: TYPE
+[!] Payload: Buffer de 500 'A'
 [!] Données: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA[...]
 [!] ---
+[...]
 """
 
 import socket
@@ -50,8 +54,8 @@ import time
 import signal
 
 # Variables de configuration - Modifier selon vos credentials
-FTP_USER = "chiche"
-FTP_PASS = "bocal"
+FTP_USER = "test"
+FTP_PASS = "test"
 
 class FTPFuzzer:
     def __init__(self, host, port=21):
@@ -165,11 +169,17 @@ class FTPFuzzer:
     def fuzz_ftp_commands(self):
         """Teste les commandes FTP avec différents payloads"""
         # Commandes FTP principales à tester
+
         ftp_commands = [
-            "PWD", "CWD", "MKD", "RMD", "DELE", "RNFR", "RNTO",
-            "LIST", "NLST", "RETR", "STOR", "APPE", "REST",
-            "SITE", "CHMOD", "SIZE", "MDTM", "HELP", "NOOP",
-            "SYST", "STAT", "TYPE", "MODE", "STRU", "ALLO"
+            "USER", "PASS", "ACCT", "CWD", "CDUP", "SMNT", "PWD", "XPWD",
+            "RETR", "STOR", "APPE", "STOU", "ALLO", "REST", "RNFR", "RNTO",
+            "ABOR", "DELE", "RMD", "MKD", "XMKD", "XRMD", "LIST", "NLST",
+            "STAT", "PORT", "PASV", "LPRT", "LPSV", "EPRT", "EPSV", "TYPE",
+            "STRU", "MODE", "SYST", "FEAT", "OPTS", "HELP", "SITE", "NOOP",
+            "QUIT", "REIN", "SIZE", "MDTM", "MLST", "MLSD", "MFMT", "MFCT",
+            "LANG", "CLNT", "HOST", "AUTH", "PBSZ", "PROT", "CCC", "ADAT",
+            "ENC", "MIC", "CONF", "EPRT", "EPSV", "MODE", "STRU", "SMNT",
+            "ACCT", "REIN"
         ]
 
         print(f"[*] Début du fuzzing sur {self.host}:{self.port}")
@@ -202,7 +212,7 @@ def signal_handler(sig, frame):
 def main():
     if len(sys.argv) != 2:
         print("Usage: python3 1ftpfuzzer.py <target_host>")
-        print("Exemple: python3 1ftpfuzzer.py 192.168.1.100")
+        print("Exemple: python3 1ftpfuzzer.py 127.0.0.1")
         sys.exit(1)
 
     signal.signal(signal.SIGINT, signal_handler)

