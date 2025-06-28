@@ -50,8 +50,8 @@ import time
 import signal
 
 # Variables de configuration - Modifier selon vos credentials
-FTP_USER = "test"
-FTP_PASS = "test"
+FTP_USER = "chiche"
+FTP_PASS = "bocal"
 
 class FTPFuzzer:
     def __init__(self, host, port=21):
@@ -64,11 +64,11 @@ class FTPFuzzer:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(10)
             sock.connect((self.host, self.port))
-            
+
             # Lire la bannière
             response = sock.recv(1024).decode('utf-8', errors='ignore')
             print(f"[+] Connexion établie: {response.strip()}")
-            
+
             # Authentification
             sock.send(f"USER {FTP_USER}\r\n".encode('utf-8'))
             response = sock.recv(1024).decode('utf-8', errors='ignore')
@@ -76,7 +76,7 @@ class FTPFuzzer:
                 print(f"[-] Échec USER: {response}")
                 sock.close()
                 return None
-            
+
             if "331" in response:
                 sock.send(f"PASS {FTP_PASS}\r\n".encode('utf-8'))
                 response = sock.recv(1024).decode('utf-8', errors='ignore')
@@ -84,10 +84,10 @@ class FTPFuzzer:
                     print(f"[-] Échec PASS: {response}")
                     sock.close()
                     return None
-            
+
             print("[+] Authentification réussie")
             return sock
-            
+
         except Exception as e:
             print(f"[-] Erreur de connexion/auth: {e}")
             return None
@@ -95,22 +95,22 @@ class FTPFuzzer:
     def test_single_command(self, command, payload, description=""):
         """Teste UNE commande avec UNE connexion fraîche"""
         print(f"\n[*] Test: {command} avec {description}")
-        
+
         # Nouvelle connexion pour ce test
         sock = self.connect_and_auth()
         if not sock:
             print("[-] Impossible de se connecter pour ce test")
             return False
-        
+
         try:
             # Envoyer la commande de test
             test_cmd = f"{command} {payload}\r\n"
             sock.send(test_cmd.encode('utf-8', errors='ignore'))
-            
+
             # Attendre la réponse avec un timeout
             sock.settimeout(5)
             response = sock.recv(4096).decode('utf-8', errors='ignore')
-            
+
             if response:
                 print(f"[+] Réponse: {response[:100].strip()}...")
                 print("[+] Test terminé normalement")
@@ -118,7 +118,7 @@ class FTPFuzzer:
             else:
                 print("[!] CRASH DÉTECTÉ! Aucune réponse reçue")
                 crash_detected = True
-                
+
         except socket.timeout:
             print("[!] CRASH DÉTECTÉ! Timeout - serveur ne répond plus")
             crash_detected = True
@@ -133,33 +133,33 @@ class FTPFuzzer:
                 sock.close()
             except:
                 pass
-        
+
         if crash_detected:
             print(f"[!] Commande: {command}")
             print(f"[!] Payload: {payload[:100]}...")
             print(f"[!] Longueur payload: {len(payload)}")
             return True
-        
+
         return False
 
     def generate_payloads(self):
         """Génère différents types de payloads de test"""
         payloads = []
-        
+
         # Payloads de taille croissante
         for size in [100, 500, 1000, 2000, 5000]:
             payloads.append(("A" * size, f"Buffer de {size} 'A'"))
-        
+
         # Payloads avec caractères spéciaux
         special_chars = [
-            ("%s" * 200, "Format string"),
-            ("../" * 200, "Directory traversal"),
-            ("\x00" * 200, "Null bytes"),
-            ("\xff" * 200, "High bytes"),
-            ("%" + "41" * 200, "Hex encoding"),
+            ("%s" * 10, "Format string"),
+            ("../" * 10, "Directory traversal"),
+            ("\x00" * 10, "Null bytes"),
+            ("\xff" * 10, "High bytes"),
+            ("%" + "41" * 10, "Hex encoding"),
         ]
         payloads.extend(special_chars)
-        
+
         return payloads
 
     def fuzz_ftp_commands(self):
@@ -171,27 +171,27 @@ class FTPFuzzer:
             "SITE", "CHMOD", "SIZE", "MDTM", "HELP", "NOOP",
             "SYST", "STAT", "TYPE", "MODE", "STRU", "ALLO"
         ]
-        
+
         print(f"[*] Début du fuzzing sur {self.host}:{self.port}")
         print(f"[*] Credentials: {FTP_USER} / {FTP_PASS}")
         print(f"[*] Stratégie: Connexion fraîche pour chaque test")
-        
+
         crashes = []
         payloads = self.generate_payloads()
-        
+
         for command in ftp_commands:
             print(f"\n[*] === Test de la commande {command} ===")
-            
+
             for payload, description in payloads:
                 crash_detected = self.test_single_command(command, payload, description)
-                
+
                 if crash_detected:
                     crashes.append((command, payload, description))
                     print(f"[!] >>> VULNÉRABILITÉ TROUVÉE: {command} <<<")
                     # Continuer avec les autres payloads pour cette commande
-                
-                time.sleep(0.5)  # Pause plus longue entre tests
-        
+
+                time.sleep(0.5)
+
         return crashes
 
 def signal_handler(sig, frame):
@@ -204,12 +204,12 @@ def main():
         print("Usage: python3 1ftpfuzzer.py <target_host>")
         print("Exemple: python3 1ftpfuzzer.py 192.168.1.100")
         sys.exit(1)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     target_host = sys.argv[1]
     fuzzer = FTPFuzzer(target_host)
-    
+
     try:
         # Test de connexion initial
         print("[*] Test de connexion initial...")
@@ -219,14 +219,14 @@ def main():
             sys.exit(1)
         test_sock.close()
         print("[+] Serveur accessible, début du fuzzing...")
-        
+
         # Lancement du fuzzing
         crashes = fuzzer.fuzz_ftp_commands()
-        
+
         # Rapport final
         print(f"\n[*] === RAPPORT FINAL ===")
         print(f"[*] Nombre de crashes détectés: {len(crashes)}")
-        
+
         if crashes:
             print("[!] VULNÉRABILITÉS TROUVÉES:")
             for cmd, payload, desc in crashes:
@@ -236,7 +236,7 @@ def main():
                 print("[!] ---")
         else:
             print("[+] Aucune vulnérabilité détectée")
-            
+
     except KeyboardInterrupt:
         print("\n[*] Arrêt demandé par l'utilisateur")
     except Exception as e:
